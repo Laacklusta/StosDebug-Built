@@ -2,14 +2,12 @@ name: Build StosDebug
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build iOS app
     runs-on: macos-26
 
     steps:
@@ -21,46 +19,48 @@ jobs:
         with:
           xcode-version: "26.2"
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+      - name: Show Xcode
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: List project
+        run: |
+          xcodebuild \
+            -project StosDebug.xcodeproj \
+            -list
 
       - name: Build
         run: |
-          set -e
-
           xcodebuild \
             -project StosDebug.xcodeproj \
-            -target StosDebug \
+            -scheme StosDebug \
             -configuration Release \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
+            -derivedDataPath "$GITHUB_WORKSPACE/build" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            clean build
+            build
 
-      - name: Package app
+      - name: Package IPA
         run: |
-          set -e
+          set -eux
 
-          mkdir -p artifacts
-          cp -R build/Build/Products/Release-iphoneos/StosDebug.app \
-            artifacts/StosDebug.app
+          APP_PATH="$GITHUB_WORKSPACE/build/Build/Products/Release-iphoneos/StosDebug.app"
 
-      - name: Create IPA
-        run: |
-          set -e
+          test -d "$APP_PATH"
 
           mkdir -p artifacts/Payload
-          cp -R artifacts/StosDebug.app artifacts/Payload/
+          cp -R "$APP_PATH" artifacts/Payload/
 
           cd artifacts
           zip -r StosDebug.ipa Payload
           rm -rf Payload
 
-      - name: Upload build artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: StosDebug
+          name: StosDebug-IPA
           path: artifacts/StosDebug.ipa
           if-no-files-found: error
